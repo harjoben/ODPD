@@ -18,6 +18,7 @@ public final class R {
     public static final class id {
         public static final int accounts=0x7f050013;
         public static final int addButton=0x7f050016;
+        public static final int amount=0x7f050019;
         public static final int amtText=0x7f050007;
         public static final int cancelButton=0x7f05000c;
         public static final int editText1=0x7f050000;

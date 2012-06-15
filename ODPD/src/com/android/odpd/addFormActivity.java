@@ -8,6 +8,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONStringer;
 
@@ -33,12 +34,14 @@ public class addFormActivity extends Activity {
 	public static final String PREF_NAME = "ODPD";
 	private static final String SERVICE_URI = "http://odpd.cloudapp.net/RestServiceImpl.svc";
 	public String id;
-	public String friend;
+	public String friendId;
+	public String friendName;
 	public String ower;
 	public String lender;
 	public double amount;
 	public String title;
 	public int isExternal;
+	public boolean isOwer = false;
 	//public DateTime date;
 	
 	public void onCreate(Bundle savedInstanceState) {
@@ -60,10 +63,12 @@ public class addFormActivity extends Activity {
 		//}
         final String friendId = getIntent().getStringExtra("id");
         final String name = getIntent().getStringExtra("name");
-        friend = friendId;
+        this.friendId = friendId;
+        this.friendName = name;
         TextView nameView = (TextView)findViewById(R.id.nameTextView);
         nameView.setText(name);
         
+        //To display the profile picture
         new Thread(new Runnable(){
 
 			@Override
@@ -104,16 +109,68 @@ public class addFormActivity extends Activity {
 		View rb = rbgrp.findViewById(rbid);
 		int idx = rbgrp.indexOfChild(rb);
 		if(idx == 0){
-			ower = friend;
+			ower = friendId;
 			lender = id;
+			isOwer = false;
 		}
 		else if(idx == 1){
 			ower = id;
-			lender = friend;
+			lender = friendId;
+			isOwer = true;
 		}
 		amount = Double.valueOf(amt.getText().toString()).doubleValue();
 		title = t.getText().toString();
 		isExternal = 1;
+		
+		try{
+			
+			String accounts = settings.getString("accounts", "[]");
+			double bal = amount;
+			JSONObject accts = new JSONObject(accounts);
+			JSONArray acctList = accts.getJSONArray("accounts");
+			JSONObject acct = new JSONObject();
+			int position = -1;
+			for(int i = 0; i < acctList.length(); i++){
+				if(acctList.getJSONObject(i).getString("id").equalsIgnoreCase(friendId)){
+					acct = acctList.getJSONObject(i);
+					position = i;
+					break;
+				}
+			}
+			acct.put("name",friendName);
+			acct.put("id",friendId);
+			if(isOwer){
+			
+				if(acct.has("amount")){
+					bal = acct.getDouble("amount") - amount;
+				}
+				else{
+					bal = amount*(-1);
+				}
+			}
+			else if(!isOwer){
+				if(acct.has("amount")){
+					bal = acct.getDouble("amount") + amount;
+				}
+			}
+			
+			acct.put("amount", bal);
+			
+			if(position == -1){
+				acctList.put(acct);
+			}
+			else if(position != -1){
+				acctList.put(position, acct);
+			}
+			accts.put("accounts", acctList);
+			
+			SharedPreferences.Editor editor = settings.edit();
+			editor.putString("accounts", accts.toString());
+			editor.commit();
+		}
+		catch(Exception e){
+			Log.e("addFormActivity.onOkClick",e.toString());
+		}
 		finish();
 	}
 	

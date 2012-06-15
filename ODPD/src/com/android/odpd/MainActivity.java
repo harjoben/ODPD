@@ -52,6 +52,8 @@ public class MainActivity extends Activity {
     public static ListView accountList;
     public static ProgressDialog progress;
     public static TabHost tabhost;
+    private ArrayList<HashMap<String, Object>> accounts;
+    private mainAdapter main;
     
     Map<String, String> map;
     
@@ -276,10 +278,39 @@ public class MainActivity extends Activity {
     	
     }
     
-    public void initLists(ArrayList<HashMap<String, Object>> accounts){
-    	mainAdapter main = new mainAdapter(this, accounts);
+    public void initLists(){
+    	main = new mainAdapter(this, accounts);
     	ListView lv = (ListView)findViewById(R.id.listAccount);
     	lv.setAdapter(main);
+    	
+    	//Adding the summary objects to the local storage
+    	try{
+    		//String accts = settings.getString("accounts", "[\"accounts\" : {}]");
+    		JSONObject tabs = new JSONObject();// = new JSONObject(accts);
+    		JSONArray friendTabs = new JSONArray();// = tabs.getJSONArray("accounts");
+    		JSONObject tab;// = new JSONObject();
+    		//String myID = map.get("id");
+    		//double bal = 0;
+    		//String hisID = "";
+    		for(int i = 0; i < accounts.size(); i++){
+    			tab = new JSONObject();
+    			tab.put("name", accounts.get(i).get("name").toString());
+    			tab.put("id", accounts.get(i).get("id").toString());
+    			tab.put("amount", Double.valueOf(accounts.get(i).get("amount").toString()).doubleValue());
+    			tab.put("date", accounts.get(i).get("date").toString());
+    			friendTabs.put(tab);
+    		}
+    		tabs.put("accounts", friendTabs);
+    		Log.d("tabs",tabs.toString());
+    		SharedPreferences.Editor editor = settings.edit();
+    		editor.putString("accounts", tabs.toString());
+    		editor.commit();
+    	}
+    	catch(Exception e){
+    		//Toast.makeText(this, e.toString(), Toast.LENGTH_LONG).show();
+    		//Log.e("tabs",tabs.toString());
+    		Log.e("error",e.toString());
+    	}
     }
     
     public void onAddButtonClick(View v){
@@ -293,7 +324,30 @@ public class MainActivity extends Activity {
 
         facebook.authorizeCallback(requestCode, resultCode, data);
     }
-
+    
+    @Override
+    public void onResume(){
+    	try{
+    		this.accounts.clear();
+    		HashMap<String, Object> temp;
+    		String tabs = settings.getString("accounts", "[]");
+    		JSONObject tab = new JSONObject(tabs);
+    		JSONArray tabList = tab.getJSONArray("accounts");
+    		for(int i = 0; i < tabList.length(); i++){
+    			temp = new HashMap<String, Object>();
+    			temp.put("id", tabList.getJSONObject(i).getString("id"));
+    			temp.put("name", tabList.getJSONObject(i).getString("name"));
+    			temp.put("amount", tabList.getJSONObject(i).getDouble("amount"));
+    			accounts.add(temp);
+    		}
+    		main.notifyDataSetChanged();
+    	}
+    	catch(Exception e){
+    		Log.e("MainActivity.onResume", e.toString());
+    	}
+    	super.onResume();
+    }
+    
     private class AddUser extends AsyncTask<String,Void,String> 
     {
     @Override
@@ -392,30 +446,57 @@ public class MainActivity extends Activity {
     		//String[] values = new String[summaries.length()];
     		ArrayList<HashMap<String, Object>> values = new ArrayList<HashMap<String, Object>>();
     		HashMap<String, Object> temp;
+    		String myID = map.get("id");
+    		String hisID = "";
+    		double bal = 0;
     		for (int i = 0; i < summaries.length(); i++){
     			JSONObject summary = summaries.getJSONObject(i);
     			temp = new HashMap<String, Object>();
-    			temp.put("ower", summary.getString("ower"));
-    			temp.put("lender", summary.getString("lender"));
-    			temp.put("amount", summary.getDouble("amount"));
+    			if(myID.equalsIgnoreCase(summary.getString("ower"))){
+    				bal = (summary.getDouble("amount")) * (-1);
+    				hisID = summary.getString("lender");
+    			}
+    			else if(myID.equalsIgnoreCase(summary.getString("lender"))){
+    				bal = summary.getDouble("amount");
+    				hisID = summary.getString("ower");
+    			}
+    			//bal = Double.valueOf(accounts.get(i).get("amount").toString()).doubleValue();
+    			String friend = settings.getString("friends", "");
+    			JSONObject friends = new JSONObject(friend);
+    			JSONArray friendList = friends.getJSONArray("data");
+    			for(int k = 0; k < friendList.length(); k++){
+    				if(friendList.getJSONObject(k).getString("id").equalsIgnoreCase(hisID)){
+    					//tab.put("name", friendList.getJSONObject(k).getString("name").toString());
+    					temp.put("name", friendList.getJSONObject(k).getString("name").toString());
+    					break;
+    				}
+    			}
+    			
+    			
+    			
+    			temp.put("id", hisID);
+    			//temp.put("lender", summary.getString("lender"));
+    			temp.put("amount", bal);
     			temp.put("date", summary.getString("date"));
     			
     			values.add(temp);
     			//values[i] = summary.toString();
     		}
-    		final ArrayList<HashMap<String, Object>> value = values;
+    		MainActivity.this.accounts = values;
     		MainActivity.this.runOnUiThread(new Runnable(){
 
 				@Override
 				public void run() {
 					// TODO Auto-generated method stub
-					initLists(value);
+					initLists();
 				}
     			
     		});
     		
     	}
-    	catch(Exception e){}
+    	catch(Exception e){
+    		Log.e("error",e.toString());
+    	}
     	
     }
     
